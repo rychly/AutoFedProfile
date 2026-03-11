@@ -1,0 +1,5 @@
+[default]
+fetch.github = 'adap/flower'
+# >=v1.19.0 requires poetry-core>=2.1.3 which is not yet updated in nixpkgs
+# src.manual = 'v1.18.0'
+src.github = 'adap/flower'

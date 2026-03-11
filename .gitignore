@@ -2,3 +2,9 @@
 /.venv-wsl312
 *.pyc
 *.pyc
+
+# Nix
+result
+
+# direnv
+.direnv

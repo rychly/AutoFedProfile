@@ -1,0 +1,23 @@
+{
+    "default": {
+        "cargoLocks": null,
+        "date": null,
+        "extract": null,
+        "name": "default",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "deepClone": false,
+            "fetchSubmodules": false,
+            "leaveDotGit": false,
+            "name": null,
+            "owner": "adap",
+            "repo": "flower",
+            "rev": "v1.25.0",
+            "sha256": "sha256-nsmlZt6lwUqMznu2GxZQsWUdL6EuibiEjN/w2LHr8eo=",
+            "sparseCheckout": [],
+            "type": "github"
+        },
+        "version": "v1.25.0"
+    }
+}
