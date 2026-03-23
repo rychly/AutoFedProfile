@@ -1,10 +1,43 @@
 import copy
+from typing import Any
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+
+
+def evaluate_model(
+    model: nn.Module,
+    data_loader: DataLoader[Any],
+    criterion: nn.Module,
+    device: str | torch.device = "cpu",
+) -> float:
+    model.eval()
+    model.to(device)
+    criterion.to(device)
+
+    total_loss = 0.0
+    num_samples = 0
+
+    with torch.no_grad():
+        for batch in data_loader:
+            # Handle both TensorDataset [batch] and standard (X, y) tuples
+            inputs = (
+                batch[0].to(device)
+                if isinstance(batch, (list, tuple))
+                else batch.to(device)
+            )
+
+            outputs = model(inputs)
+            loss = criterion(outputs, inputs)
+
+            batch_size = inputs.size(0)
+            total_loss += loss.item() * batch_size
+            num_samples += batch_size
+
+    return total_loss / num_samples if num_samples > 0 else 0.0
 
 
 def train_autoencoder(
@@ -14,12 +47,13 @@ def train_autoencoder(
     max_epochs: int = 50,
     batch_size: int = 16,
     lr: float = 1e-3,
+    criterion: nn.Module | None = None,
     early_stopping_patience: int = 10,
     device: str | torch.device = "cpu",
 ) -> dict[str, list[float]]:
     # Prepare DataLoaders (Equivalent to Keras x_train, x_train)
-    t_train = torch.tensor(x_train, dtype=torch.float32)
-    t_val = torch.tensor(x_val, dtype=torch.float32)
+    t_train = torch.as_tensor(x_train, dtype=torch.float32)
+    t_val = torch.as_tensor(x_val, dtype=torch.float32)
 
     train_loader = DataLoader(
         TensorDataset(t_train), batch_size=batch_size, shuffle=True
@@ -28,8 +62,9 @@ def train_autoencoder(
 
     # Setup Optimizer and Loss
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    loss_criterion = nn.BCELoss()
+    loss_criterion = criterion or nn.BCELoss()
     model.to(device)
+    loss_criterion.to(device)
 
     # Early Stopping Variables
     best_val_loss = float("inf")
@@ -52,17 +87,8 @@ def train_autoencoder(
             train_loss += loss.item() * batch.size(0)
 
         # --- Validation Phase ---
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for [v_batch] in val_loader:
-                v_batch = v_batch.to(device)
-                v_outputs = model(v_batch)
-                v_loss = loss_criterion(v_outputs, v_batch)
-                val_loss += v_loss.item() * v_batch.size(0)
-
         avg_train_loss = train_loss / len(t_train)
-        avg_val_loss = val_loss / len(t_val)
+        avg_val_loss = evaluate_model(model, val_loader, loss_criterion, device)
 
         history["loss"].append(avg_train_loss)
         history["val_loss"].append(avg_val_loss)
