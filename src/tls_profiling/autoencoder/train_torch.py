@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
 
@@ -94,6 +95,26 @@ def train_autoencoder(
     model.to(device)
     loss_criterion.to(device)
 
+    # Initialize the Adaptive Learning Rate Scheduler for higher number of epochs or StepLR for lower
+    scheduler = (
+        ReduceLROnPlateau(
+            # factor=0.5: cut LR in half when triggered
+            # patience: how many epochs to wait before reducing (should be less than early_stopping_patience)
+            optimizer,
+            mode="min",
+            factor=0.5,
+            patience=early_stopping_patience // 2,
+        )
+        if max_epochs >= 20
+        else StepLR(
+            # step_size=2 means the LR will multiply by gamma every 2 epochs
+            # gamma=0.5 means that every time the scheduler triggers, the learning rate is cut in half
+            optimizer,
+            step_size=2,
+            gamma=0.5,
+        )
+    )
+
     # Early Stopping Variables
     best_val_loss = float("inf")
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -126,6 +147,12 @@ def train_autoencoder(
             print(
                 f"Epoch {epoch + 1}/{max_epochs} - loss: {avg_train_loss:.4f} - val_loss: {avg_val_loss:.4f}"
             )
+
+        # Step the Adaptive Scheduler based on validation loss
+        if isinstance(scheduler, ReduceLROnPlateau):
+            scheduler.step(avg_val_loss)
+        else:
+            scheduler.step()
 
         # --- Early Stopping Logic ---
         if avg_val_loss < best_val_loss:

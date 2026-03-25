@@ -106,7 +106,7 @@ def extract_features(df: pd.DataFrame, tls_rec_len:int=20) -> pd.DataFrame:
     df = df.copy()
     tls_rec_columns_names = np.array([f"tls.rec.{i}" for i in range(tls_rec_len)])
     flow_data = df[['bs', 'ps', 'br', 'pr', 'td']].astype(float)
-    tls_data = df[['tls.cver','tls.sver','tls.scs']].fillna(0).astype(str) 
+    tls_data = df[['tls.cver','tls.sver','tls.scs']].fillna("0").astype(str) 
 
     sext_possible_values = ['0000','0005','0010','0017','0023','0033','000B','002B','FF01']
     tls_sext_mlb = _build_mlb_frame(df['tls.sext'], sext_possible_values)
