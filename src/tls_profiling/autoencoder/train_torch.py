@@ -8,22 +8,31 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
 
-def evaluate_model(
+def compute_recon_error(
     model: nn.Module,
-    data_loader: DataLoader[Any],
+    data_loader: np.ndarray | DataLoader[Any],
     criterion: nn.Module,
     device: str | torch.device = "cpu",
-) -> float:
+) -> np.ndarray:
+    """Calculates the specific criterion loss for every single sample in the loader."""
     model.eval()
     model.to(device)
     criterion.to(device)
+    all_errors = []
 
-    total_loss = 0.0
-    num_samples = 0
+    # Ensure the criterion does not average the results automatically
+    # We need the 'none' reduction to get one value per sample
+    original_reduction = getattr(criterion, "reduction", "mean")
+    criterion.reduction = "none"  # pyright: ignore[reportArgumentType]
+
+    iterator = (
+        [torch.as_tensor(data_loader).float()]
+        if isinstance(data_loader, np.ndarray)
+        else data_loader
+    )
 
     with torch.no_grad():
-        for batch in data_loader:
-            # Handle both TensorDataset [batch] and standard (X, y) tuples
+        for batch in iterator:
             inputs = (
                 batch[0].to(device)
                 if isinstance(batch, (list, tuple))
@@ -31,13 +40,32 @@ def evaluate_model(
             )
 
             outputs = model(inputs)
+            # This now returns a tensor of shape (batch_size,)
+            # instead of a single averaged scalar
             loss = criterion(outputs, inputs)
 
-            batch_size = inputs.size(0)
-            total_loss += loss.item() * batch_size
-            num_samples += batch_size
+            # If the loss is multidimensional (like MSE before reduction),
+            # we average across the feature dimension (dim=1)
+            if loss.dim() > 1:
+                loss = torch.mean(loss, dim=1)
 
-    return total_loss / num_samples if num_samples > 0 else 0.0
+            all_errors.extend(loss.cpu().numpy())
+
+    # Restore original reduction setting just in case the criterion is reused elsewhere
+    criterion.reduction = original_reduction  # pyright: ignore[reportArgumentType]
+
+    return np.array(all_errors)
+
+
+def evaluate_model(
+    model: nn.Module,
+    data_loader: DataLoader[Any],
+    criterion: nn.Module,
+    device: str | torch.device = "cpu",
+) -> float:
+    """Standard evaluation that returns the mean loss across the dataset."""
+    errors = compute_recon_error(model, data_loader, criterion, device)
+    return float(np.mean(errors)) if len(errors) > 0 else 0.0
 
 
 def train_autoencoder(
